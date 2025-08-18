@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Snooker Score (Canvas) — History + Snooker Fix</title>
+  <meta name="description" content="Snooker scoreboard (mobile-first) with in-game history and +2 snooker fix." />
+  <meta name="theme-color" content="#0ea5e9" />
+  <!-- SEO / Open Graph แบบพื้นฐาน -->
+  <meta property="og:title" content="Snooker Score (Mobile)" />
+  <meta property="og:description" content="บันทึกสกอร์สนุกเกอร์พร้อมประวัติระหว่างเกม + ปุ่มแก้สนุ๊ก +2" />
+  <meta property="og:type" content="website" />
+
+  <link rel="preload" href="style.css" as="style" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>Snooker Score</h1>
+    <p class="sub">มือถือมาก่อน — ประวัติในเกม & ปุ่ม “แก้สนุ๊ก +2”</p>
+  </header>
+
+  <main class="container">
+    <!-- การตั้งค่าผู้เล่น -->
+    <section class="card card-players" aria-label="ตั้งค่าผู้เล่น">
+      <div class="row">
+        <label class="field">
+          <span>ผู้เล่น A</span>
+          <input id="nameA" type="text" inputmode="text" autocomplete="off" placeholder="พิมพ์ชื่อผู้เล่น A" />
+        </label>
+        <label class="field">
+          <span>ผู้เล่น B</span>
+          <input id="nameB" type="text" inputmode="text" autocomplete="off" placeholder="พิมพ์ชื่อผู้เล่น B" />
+        </label>
+      </div>
+      <div class="row">
+        <button id="saveNames" class="btn">บันทึกชื่อ</button>
+        <button id="swapTurn" class="btn btn-secondary">สลับคิว</button>
+      </div>
+    </section>
+
+    <!-- สกอร์บอร์ด -->
+    <section class="scores" aria-label="สกอร์บอร์ด">
+      <article class="scorecard" data-player="0" aria-live="polite">
+        <div class="scorecard__name" id="p0Name">ผู้เล่น A</div>
+        <div class="scorecard__score" id="p0Score">0</div>
+        <div class="scorecard__badge" id="p0Badge" aria-label="ผู้เล่นกำลังแทง">คิว</div>
+      </article>
+      <article class="scorecard" data-player="1" aria-live="polite">
+        <div class="scorecard__name" id="p1Name">ผู้เล่น B</div>
+        <div class="scorecard__score" id="p1Score">0</div>
+        <div class="scorecard__badge" id="p1Badge" aria-label="ผู้เล่นกำลังแทง" hidden>คิว</div>
+      </article>
+    </section>
+
+    <!-- ปุ่มทำคะแนน -->
+    <section class="card actions" aria-label="ทำคะแนน">
+      <h2 class="card-title">ทำคะแนน (ให้ผู้เล่นที่กำลังแทง)</h2>
+      <div class="grid grid-balls">
+        <!-- ปุ่มสีตามคะแนนมาตรฐาน -->
+        <!-- เปลี่ยนข้อความ/สีใน CSS ตามต้องการได้ -->
+        <button class="btn ball ball-red" data-points="1" data-label="สีแดง">แดง +1</button>
+        <button class="btn ball ball-yellow" data-points="2" data-label="สีเหลือง">เหลือง +2</button>
+        <button class="btn ball ball-green" data-points="3" data-label="สีเขียว">เขียว +3</button>
+        <button class="btn ball ball-brown" data-points="4" data-label="สีน้ำตาล">น้ำตาล +4</button>
+        <button class="btn ball ball-blue" data-points="5" data-label="สีน้ำเงิน">น้ำเงิน +5</button>
+        <button class="btn ball ball-pink" data-points="6" data-label="สีชมพู">ชมพู +6</button>
+        <button class="btn ball ball-black" data-points="7" data-label="สีดำ">ดำ +7</button>
+      </div>
+
+      <h3 class="mt foul-title">ฟาว / แก้สนุ๊ก (ให้ฝั่งตรงข้าม)</h3>
+      <div class="grid grid-foul">
+        <!-- หมายเหตุ: ปุ่มเหล่านี้ให้แต้มกับฝั่งตรงข้ามของผู้เล่นที่กำลังแทงอยู่ -->
+        <button class="btn btn-foul" data-points="4" data-label="ฟาว">ฟาว +4</button>
+        <button class="btn btn-foul" data-points="2" data-label="แก้สนุ๊ก">แก้สนุ๊ก +2</button>
+      </div>
+
+      <div class="row mt">
+        <button id="undo" class="btn btn-ghost">ย้อนกลับ 1 รายการ</button>
+        <button id="reset" class="btn btn-danger">เริ่มเกมใหม่</button>
+      </div>
+    </section>
+
+    <!-- ประวัติระหว่างเกม -->
+    <section class="card history" aria-label="ประวัติระหว่างเกม">
+      <h2 class="card-title">ประวัติ (ในเกมนี้เท่านั้น)</h2>
+      <ol id="historyList" class="history-list" aria-live="polite" aria-relevant="additions removals"></ol>
+      <div class="row mt">
+        <button id="copyHistory" class="btn btn-secondary">คัดลอกประวัติ</button>
+        <button id="clearHistory" class="btn btn-ghost">ล้างประวัติ</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <small>ไม่มีการบันทึกหลังจบเกม • Static HTML/CSS/JS • เหมาะกับ GitHub Pages</small>
+  </footer>
+
+  <script defer src="script.js"></script>
+</body>
+</html>
