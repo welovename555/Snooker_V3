@@ -39,6 +39,7 @@
     historyEditMode: false,
     selectedHistoryIds: new Set(),
     playerOrder: [],
+    scoreLogs: [] // เพิ่มสำหรับเก็บ log การบวกคะแนน
   };
 
   // ===== Utils =====
@@ -48,18 +49,19 @@
   const clamp = n => n|0;
 
   function save(){
-    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({ players: state.players, selectedId: state.selectedId, results: state.results, filter: state.filter, playerOrder: state.playerOrder })); }catch(e){}
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({ players: state.players, selectedId: state.selectedId, results: state.results, filter: state.filter, playerOrder: state.playerOrder, scoreLogs: state.scoreLogs })); }catch(e){}
   }
   function load(){
     try{
       const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('snooker-lite-v7') || localStorage.getItem('snooker-lite-v6') || localStorage.getItem('snooker-lite-v5') || localStorage.getItem('snooker-lite-v4') || localStorage.getItem('snooker-lite-v3');
       if(raw){
-        const s = JSON.parse(raw);
-        state.players = Array.isArray(s.players)? s.players: [];
-        state.selectedId = s.selectedId ?? null;
-        state.results = Array.isArray(s.results)? s.results: [];
-        if(s.filter) state.filter = { ...state.filter, ...s.filter };
-        state.playerOrder = Array.isArray(s.playerOrder) ? s.playerOrder : [];
+        const data = JSON.parse(raw);
+        state.players = data.players || [];
+        state.selectedId = data.selectedId || null;
+        state.results = data.results || [];
+        state.filter = data.filter || { mode: 'all', playerId: '' };
+        state.playerOrder = data.playerOrder || [];
+        state.scoreLogs = data.scoreLogs || [];
       }
     }catch(e){ console.warn('Load failed', e); }
   }
@@ -176,6 +178,17 @@
   }
   window.deletePlayer = deletePlayer; // ให้ปุ่มลบเรียกได้
 
+  function addSnooker(){
+    const p = selected();
+    if(!p) return;
+    p.score = p.score + 2;
+    // เพิ่ม log แก้สนุ๊ก
+    state.scoreLogs.push({ playerId: p.id, name: p.name, color: 'snooker', value: 2, hex: '#fde047', at: Date.now(), snooker: true });
+    if(state.scoreLogs.length > 200) state.scoreLogs = state.scoreLogs.slice(-200);
+    runNotice({ kind:'plus', text: `${p.name} +2 (แก้สนุ๊ก)`, ballColor: '#fde047', barColor: '#fde047', durationMs: DURATION_PLUS });
+    save(); render();
+  }
+
   // ===== Renderers =====
   function render(){
     qs('#selectedName').textContent = selected()?.name || '—';
@@ -188,6 +201,18 @@
         const orderIndex = state.playerOrder.indexOf(p.id);
         const orderText = orderIndex !== -1 ? `ผู้เล่นคนที่ ${orderIndex + 1}` : '';
         const isSelected = state.selectedId === p.id;
+        // ดึง 5 log ล่าสุดของผู้เล่นนี้
+        const logs = state.scoreLogs.filter(l => l.playerId === p.id).slice(-5).reverse();
+        let logsHtml = '';
+        if(logs.length > 0) {
+          logsHtml = `<div class="mt-2 text-xs text-slate-300">ประวัติคะแนนล่าสุด:` +
+            logs.map(l =>
+              l.foul ? `<span class="inline-flex items-center mr-2"><span style="display:inline-block;width:1em;height:1em;text-align:center;line-height:1em;color:#ef4444;font-size:1.1em;">❌</span>-4</span>` :
+              l.snooker ? `<span class=\"inline-flex items-center mr-2\"><span style=\"display:inline-block;width:1em;height:1em;text-align:center;line-height:1em;color:#fde047;font-size:1.1em;\">⛏️</span>+2</span>` :
+              `<span class=\"inline-flex items-center mr-2\"><span style=\"display:inline-block;width:1em;height:1em;border-radius:50%;background:${l.hex};margin-right:4px;\"></span>${l.value}</span>`
+            ).join('') +
+            `</div>`;
+        }
         return `
         <div class="player-card p-4 rounded-2xl border-2 transition select-none cursor-pointer flex justify-between items-center animate-fade-in ${isSelected? 'border-sky-400 bg-sky-400/15 selected':'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'}" data-player-id="${p.id}">
           <div class="flex items-center gap-3 flex-1" style="min-width:0;">
@@ -195,6 +220,7 @@
             <div class="truncate">
               <div class="font-semibold truncate text-lg">${escapeHtml(p.name)}</div>
               ${orderText ? `<div class="text-xs text-slate-400 truncate">${orderText}</div>` : ''}
+              ${logsHtml}
             </div>
           </div>
           <div class="flex items-center gap-4 ml-3">
@@ -241,8 +267,21 @@
         <span class="center-abs">${b.value}</span>
       </button>
     `).join('');
-
+    // ฟาวล์
+    pad.parentElement.nextElementSibling.innerHTML = `
+      <div class="text-sm mb-2">ฟาวล์</div>
+      <button data-action="foul" class="relative overflow-hidden w-full rounded-2xl py-3 bg-rose-600 hover:bg-rose-700 active:scale-[.99] transition shadow-soft disabled:opacity-40 disabled:cursor-not-allowed">
+        <span class="relative z-10">ฟาวล์ -4</span>
+        <span class="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/10 via-white/0 to-white/10 animate-shimmer [background-size:200%_100%]"></span>
+      </button>
+      <div class="text-sm mb-2 mt-4">แก้สนุ๊ก</div>
+      <button data-action="snooker" class="relative overflow-hidden w-full rounded-2xl py-3 bg-yellow-400 hover:bg-yellow-500 active:scale-[.99] transition shadow-soft text-yellow-900 font-bold disabled:opacity-40 disabled:cursor-not-allowed">
+        <span class="relative z-10">⛏️ +2</span>
+        <span class="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/10 via-white/0 to-white/10 animate-shimmer [background-size:200%_100%]"></span>
+      </button>
+    `;
     qs('[data-action="foul"]').disabled = !canScore;
+    qs('[data-action="snooker"]').disabled = !canScore;
 
     renderResults();
     renderFilterPlayer();
@@ -369,6 +408,10 @@
     const ball = BALLS.find(b=>b.key===ballKey);
     if(!ball) return;
     p.score = p.score + ball.value;
+    // เพิ่ม log
+    state.scoreLogs.push({ playerId: p.id, name: p.name, color: ball.key, value: ball.value, hex: ball.hex, at: Date.now(), foul: false });
+    // จำกัด log ไม่เกิน 200 รายการ (กัน localStorage เต็ม)
+    if(state.scoreLogs.length > 200) state.scoreLogs = state.scoreLogs.slice(-200);
     runNotice({ text: `${p.name} +${ball.value}`, ballColor: ball.hex });
     save(); render();
   }
@@ -377,6 +420,9 @@
     const p = selected();
     if(!p) return;
     p.score = p.score - 4;
+    // เพิ่ม log ฟาวล์
+    state.scoreLogs.push({ playerId: p.id, name: p.name, color: 'foul', value: -4, hex: '#ef4444', at: Date.now(), foul: true });
+    if(state.scoreLogs.length > 200) state.scoreLogs = state.scoreLogs.slice(-200);
     runNotice({ kind:'foul', text: `${p.name} -4`, ballColor: RED, barColor: RED, durationMs: DURATION_FOUL });
     save(); render();
   }
@@ -392,6 +438,7 @@
 
     state.players.forEach(p => p.score = 0);
     state.selectedId = null;
+    state.scoreLogs = []; // ล้างประวัติกดคะแนน
 
     showCelebrate(entry);
     save(); render();
@@ -403,6 +450,7 @@
       state.selectedId = null;
       state.playerOrder = [];
       qs('#randomResult').classList.add('hidden');
+      state.scoreLogs = []; // ล้างประวัติกดคะแนน
       save(); render();
     });
   }
@@ -490,6 +538,7 @@
           break;
         }
         case 'foul': addFoul(); break;
+        case 'snooker': addSnooker(); break;
         case 'end': endGame(); break;
         case 'reset': resetGame(); break;
         case 'toggle-result': {
